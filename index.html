@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090a0c" />
+  <meta name="description" content="可離線使用的 iPhone 風格工程計算機，支援三角函數、對數、冪次與括號。" />
+  <title>創建事務所計算機</title>
+  <style>
+    :root { color-scheme:dark; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; color:#f6f7fa; background:#090a0c; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at 50% 0%,#29303a 0,transparent 48%),radial-gradient(circle at 100% 100%,#292019 0,transparent 30%); }
+    .app { position:relative; width:min(100%,560px); min-height:100vh; padding:max(18px,env(safe-area-inset-top)) 17px max(20px,env(safe-area-inset-bottom)); display:flex; flex-direction:column; justify-content:center; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:0 3px 13px; color:#9299a5; font-size:12px; letter-spacing:.12em; text-transform:uppercase; }
+    .title { color:#f4f5f7; font-size:14px; font-weight:650; letter-spacing:.02em; text-transform:none; }
+    .mode { border:1px solid #414650; border-radius:999px; color:#f1f3f5; background:#202329; padding:7px 13px; font-size:12px; font-weight:650; cursor:pointer; }
+    .display { min-height:155px; padding:20px 8px 17px; display:flex; flex-direction:column; justify-content:flex-end; align-items:flex-end; overflow:hidden; }
+    .memory { min-height:18px; width:100%; color:#8c929d; text-align:left; font-size:11px; }
+    .formula { width:100%; min-height:28px; color:#8b929f; font-size:17px; text-align:right; white-space:nowrap; overflow-x:auto; scrollbar-width:none; }
+    .formula::-webkit-scrollbar { display:none; }
+    .result { width:100%; color:#fafbfc; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:clamp(48px,13vw,72px); line-height:1.05; letter-spacing:-.055em; font-weight:300; }
+    .keys { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; }
+    button.key { min-width:0; aspect-ratio:1.16; border:1px solid #34383f; border-radius:17px; color:#f4f5f6; background:linear-gradient(145deg,#292c32,#22252a); font:500 clamp(15px,4.3vw,19px)/1 -apple-system,BlinkMacSystemFont,sans-serif; cursor:pointer; transition:transform .08s ease,filter .12s ease,border-color .12s ease; -webkit-tap-highlight-color:transparent; }
+    button.key:hover { filter:brightness(1.2); border-color:#535965; }
+    button.key:active { transform:scale(.94); filter:brightness(1.35); }
+    .key.function { background:#292d34; color:#d7dbe2; font-size:clamp(13px,3.7vw,16px); }
+    .key.utility { color:#ffc178; background:#332a22; border-color:#51402f; }
+    .key.operator { color:#ffad43; background:#33291e; border-color:#4c3925; font-size:23px; }
+    .key.equals { color:#16120d; background:linear-gradient(145deg,#ffbd62,#ff9500); border-color:#ffb144; font-size:24px; font-weight:700; }
+    .key.wide { grid-column:span 2; aspect-ratio:auto; }
+    .footer { color:#656b75; font-size:11px; text-align:center; margin:15px 0 0; }
+    .tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:5px; margin-bottom:13px; border:1px solid #30343b; border-radius:15px; background:#17191d; }
+    .tab { border:0; border-radius:11px; color:#969da8; background:transparent; padding:11px 4px; font-size:13px; font-weight:650; cursor:pointer; }
+    .tab.active { color:#17120c; background:linear-gradient(145deg,#ffbd62,#ff9500); }
+    .panel[hidden] { display:none; }
+    .panel-title { margin:5px 2px 14px; color:#f4f5f7; font-size:17px; font-weight:650; }
+    .panel-note { margin:-7px 2px 15px; color:#8b929f; font-size:12px; line-height:1.5; }
+    .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .field { display:flex; flex-direction:column; gap:6px; color:#aeb4be; font-size:12px; }
+    .field.full { grid-column:1/-1; }
+    input,select { width:100%; min-width:0; border:1px solid #373c45; border-radius:12px; padding:12px 11px; color:#f5f6f8; background:#1c1f24; font:500 16px -apple-system,BlinkMacSystemFont,sans-serif; outline:none; }
+    input:focus,select:focus { border-color:#ffad43; }
+    .primary-btn,.secondary-btn,.danger-btn { border:1px solid #4c3925; border-radius:12px; padding:12px 14px; color:#19130b; background:linear-gradient(145deg,#ffbd62,#ff9500); font-size:14px; font-weight:700; cursor:pointer; }
+    .secondary-btn { color:#f1f2f4; background:#292d34; border-color:#3c424c; }
+    .danger-btn { color:#ffb1a9; background:#332421; border-color:#57322d; padding:7px 10px; font-size:12px; }
+    .action-row { display:flex; gap:8px; margin-top:12px; }
+    .action-row button { flex:1; }
+    .result-card { margin-top:14px; padding:14px; border:1px solid #363b44; border-radius:15px; background:#191c21; }
+    .result-label { color:#9097a2; font-size:11px; }
+    .result-big { margin:5px 0; color:#ffbd62; font-size:30px; font-weight:550; letter-spacing:-.03em; overflow-wrap:anywhere; }
+    .result-equation { color:#c1c6cf; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+    .result-units { margin-top:5px; color:#969da8; font-size:12px; line-height:1.7; }
+    .list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+    .list-item { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px; border:1px solid #343942; border-radius:13px; background:#191c21; }
+    .item-main { min-width:0; }
+    .item-name { color:#f3f4f6; font-size:13px; font-weight:650; overflow-wrap:anywhere; }
+    .item-detail { margin-top:4px; color:#969da8; font-size:11px; line-height:1.55; overflow-wrap:anywhere; }
+    .item-value { flex:none; color:#ffbd62; font-size:14px; font-weight:650; text-align:right; }
+    .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .summary-box { padding:10px; border-radius:11px; background:#22252b; }
+    .summary-box span { display:block; color:#9ba2ad; font-size:11px; }
+    .summary-box strong { display:block; margin-top:4px; color:#f4f5f7; font-size:15px; overflow-wrap:anywhere; }
+    @media (min-height:720px) {
+      .app { height:100dvh; min-height:0; justify-content:flex-start; overflow:hidden; }
+      .panel:not([hidden]) { flex:1; min-height:0; }
+      #panel-science { display:flex; flex-direction:column; }
+      #panel-science .display { flex:0 0 clamp(82px,15vh,145px); min-height:0; padding:8px 6px 10px; }
+      #panel-science .result { font-size:clamp(40px,8vh,62px); }
+      #panel-science .keys { flex:1; min-height:0; grid-template-rows:repeat(9,minmax(0,1fr)); gap:clamp(4px,0.8vh,8px); }
+      #panel-science button.key { aspect-ratio:auto; border-radius:clamp(9px,2vh,15px); font-size:clamp(14px,2.4vh,18px); }
+      #panel-science .key.function { font-size:clamp(11px,1.9vh,14px); }
+      #panel-science .key.operator,#panel-science .key.equals { font-size:clamp(17px,3vh,22px); }
+      #panel-science .footer { margin:7px 0 0; line-height:14px; }
+      .tabs { flex:none; margin-bottom:8px; padding:3px; }
+      .tab { padding:8px 3px; }
+      .panel-title { margin:2px 2px 8px; font-size:16px; }
+      .panel-note { margin:-4px 2px 8px; font-size:11px; line-height:1.35; }
+      .form-grid { gap:6px 8px; }
+      .field { gap:3px; font-size:11px; }
+      input,select { min-height:36px; padding:7px 9px; font-size:14px; border-radius:10px; }
+      .action-row { gap:7px; margin-top:8px; }
+      .primary-btn,.secondary-btn { padding:9px 11px; font-size:13px; }
+      .result-card { margin-top:8px; padding:10px; border-radius:12px; }
+      .result-big { margin:3px 0; font-size:24px; }
+      .result-equation,.result-units { font-size:11px; line-height:1.4; }
+      .summary-grid { gap:6px; }
+      .summary-box { padding:7px 9px; }
+      .summary-box strong { margin-top:2px; font-size:13px; }
+      .list { gap:5px; margin-top:7px; max-height:clamp(54px,12vh,100px); overflow-y:auto; }
+      .list-item { padding:8px; border-radius:10px; }
+      .item-name { font-size:12px; }
+      .item-detail { margin-top:2px; font-size:10px; }
+    }
+    @media (max-height:719px) {
+      .app { height:100dvh; min-height:0; justify-content:flex-start; overflow:hidden; padding-top:max(6px,env(safe-area-inset-top)); padding-bottom:max(7px,env(safe-area-inset-bottom)); }
+      header { flex:none; padding:0 3px 5px; font-size:10px; }
+      .title { font-size:12px; }
+      .mode { padding:5px 10px; }
+      .tabs { flex:none; margin-bottom:5px; padding:2px; }
+      .tab { padding:6px 3px; font-size:11px; }
+      .panel:not([hidden]) { flex:1; min-height:0; }
+      #panel-science { display:flex; flex-direction:column; }
+      #panel-science .display { flex:0 0 clamp(58px,12vh,82px); min-height:0; padding:3px 5px 6px; }
+      #panel-science .memory { min-height:12px; font-size:9px; }
+      #panel-science .formula { min-height:18px; font-size:12px; }
+      #panel-science .result { font-size:clamp(34px,7vh,48px); }
+      #panel-science .keys { flex:1; min-height:0; grid-template-rows:repeat(9,minmax(0,1fr)); gap:3px; }
+      #panel-science button.key { aspect-ratio:auto; border-radius:8px; font-size:clamp(12px,2.5vh,16px); }
+      #panel-science .key.function { font-size:clamp(10px,2vh,13px); }
+      #panel-science .key.operator,#panel-science .key.equals { font-size:clamp(15px,3vh,20px); }
+      #panel-science .footer { margin:4px 0 0; line-height:12px; font-size:9px; }
+      .panel-title { margin:1px 2px 5px; font-size:14px; }
+      .panel-note { margin:-3px 2px 5px; font-size:10px; line-height:1.25; }
+      .form-grid { gap:4px 6px; }
+      .field { gap:2px; font-size:10px; }
+      input,select { min-height:29px; padding:4px 7px; font-size:12px; border-radius:8px; }
+      .action-row { gap:5px; margin-top:5px; }
+      .primary-btn,.secondary-btn { padding:7px 8px; font-size:11px; }
+      .danger-btn { padding:5px 7px; font-size:10px; }
+      .result-card { margin-top:5px; padding:7px; border-radius:10px; }
+      .result-label,.summary-box span { font-size:9px; }
+      .result-big { margin:2px 0; font-size:19px; }
+      .result-equation,.result-units { font-size:9px; line-height:1.3; }
+      .summary-grid { gap:4px; }
+      .summary-box { padding:5px 7px; }
+      .summary-box strong { margin-top:1px; font-size:11px; }
+      .list { gap:3px; margin-top:5px; max-height:9vh; overflow-y:auto; }
+      .list-item { padding:5px 7px; border-radius:8px; }
+      .item-name { font-size:10px; }
+      .item-detail { margin-top:1px; font-size:9px; line-height:1.25; }
+      .item-value { font-size:11px; }
+    }
+    @media (min-height:850px) { .app { padding-top:42px; padding-bottom:34px; } .display { min-height:205px; } .keys { gap:11px; } }
+    @media (max-height:720px) { .app { justify-content:flex-start; } .display { min-height:112px; padding:9px 6px 12px; } button.key { aspect-ratio:1.38; border-radius:13px; } .keys { gap:7px; } }
+    @media (max-width:360px) { .app { padding-left:11px; padding-right:11px; } .keys { gap:6px; } button.key { border-radius:12px; } }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="工程計算機">
+    <header><span class="title">創建事務所計算機</span><button id="angleMode" class="mode" aria-label="切換角度模式">DEG</button></header>
+    <nav class="tabs" aria-label="計算工具">
+      <button class="tab active" data-panel="science">工程計算</button><button class="tab" data-panel="area">面積計算</button><button class="tab" data-panel="estimate">工程估算</button>
+    </nav>
+    <section id="panel-science" class="panel">
+    <section class="display" aria-live="polite">
+      <div id="memory" class="memory"></div>
+      <div id="formula" class="formula">&nbsp;</div>
+      <div id="result" class="result">0</div>
+    </section>
+    <section class="keys" aria-label="工程計算機按鍵">
+      <button class="key utility" data-action="memory-clear">mc</button><button class="key utility" data-action="memory-recall">mr</button><button class="key utility" data-action="memory-plus">m+</button><button class="key utility" data-action="memory-minus">m−</button><button class="key utility" data-action="clear">AC</button>
+      <button class="key function" data-fn="sin">sin</button><button class="key function" data-fn="cos">cos</button><button class="key function" data-fn="tan">tan</button><button class="key function" data-action="inverse">x⁻¹</button><button class="key utility" data-action="backspace">⌫</button>
+      <button class="key function" data-fn="asin">sin⁻¹</button><button class="key function" data-fn="acos">cos⁻¹</button><button class="key function" data-fn="atan">tan⁻¹</button><button class="key function" data-action="square">x²</button><button class="key operator" data-token="÷">÷</button>
+      <button class="key function" data-fn="ln">ln</button><button class="key function" data-fn="log">log</button><button class="key function" data-action="sqrt">√</button><button class="key function" data-token="^">xʸ</button><button class="key operator" data-token="×">×</button>
+      <button class="key function" data-token="(">(</button><button class="key function" data-token=")">)</button><button class="key function" data-action="factorial">n!</button><button class="key function" data-token="%">%</button><button class="key operator" data-token="−">−</button>
+      <button class="key function" data-token="π">π</button><button class="key function" data-token="e">e</button><button class="key" data-digit="7">7</button><button class="key" data-digit="8">8</button><button class="key" data-digit="9">9</button>
+      <button class="key function" data-action="abs">|x|</button><button class="key function" data-action="sign">±</button><button class="key" data-digit="4">4</button><button class="key" data-digit="5">5</button><button class="key" data-digit="6">6</button>
+      <button class="key function" data-action="ans">Ans</button><button class="key function" data-token="," aria-label="參數分隔">,</button><button class="key" data-digit="1">1</button><button class="key" data-digit="2">2</button><button class="key" data-digit="3">3</button>
+      <button class="key function" data-action="toggle-sign">(−)</button><button class="key" data-action="decimal">.</button><button class="key wide" data-digit="0">0</button><button class="key equals" data-action="equals">=</button>
+      <button class="key function" data-fn="sqrt">sqrt(</button><button class="key function" data-fn="abs">abs(</button><button class="key function" data-fn="exp">exp(</button><button class="key operator" data-token="+">+</button><button class="key function" data-action="round">round</button>
+    </section>
+    <p class="footer">可離線使用 · 支援鍵盤輸入、括號與科學函數</p>
+    </section>
+    <section id="panel-area" class="panel" hidden>
+      <h2 class="panel-title">面積計算</h2>
+      <p class="panel-note">輸入尺寸與單位，結果統一換算為 m²，並附台坪與平方英尺參考值。</p>
+      <div class="form-grid">
+        <label class="field full">計算形狀<select id="areaShape"><option value="rectangle">矩形／樓地板</option><option value="triangle">三角形</option><option value="trapezoid">梯形</option><option value="circle">圓形</option></select></label>
+        <label class="field" id="areaLabelA">長（L）<input id="areaA" type="number" inputmode="decimal" min="0" step="any" placeholder="例如 8.5"></label>
+        <label class="field" id="areaLabelB">寬（W）<input id="areaB" type="number" inputmode="decimal" min="0" step="any" placeholder="例如 6"></label>
+        <label class="field" id="areaLabelC" hidden>高度<input id="areaC" type="number" inputmode="decimal" min="0" step="any" placeholder="高度"></label>
+        <label class="field">尺寸單位<select id="areaUnit"><option value="m">公尺（m）</option><option value="cm">公分（cm）</option><option value="mm">公厘（mm）</option><option value="ft">英尺（ft）</option></select></label>
+        <label class="field">計算數量<input id="areaCount" type="number" inputmode="decimal" min="1" step="any" value="1"></label>
+        <label class="field full">項目名稱（選填）<input id="areaName" type="text" placeholder="例如：A 棟 1F 室內樓地板"></label>
+      </div>
+      <div class="action-row"><button class="primary-btn" id="areaCalculate">計算面積</button><button class="secondary-btn" id="areaAdd" disabled>加入面積清單</button></div>
+      <div id="areaResult" class="result-card" aria-live="polite"><div class="result-label">計算結果</div><div class="result-big">—</div><div class="result-equation">輸入尺寸後顯示計算式</div></div>
+      <div class="result-card"><div class="summary-grid"><div class="summary-box"><span>清單合計</span><strong id="areaTotal">0 m²</strong></div><div class="summary-box"><span>台坪（1 坪 = 3.305785 m²）</span><strong id="areaPing">0 坪</strong></div></div><div id="areaList" class="list"></div><div class="action-row"><button class="secondary-btn" id="areaCopy">複製面積明細</button><button class="danger-btn" id="areaClear">清空清單</button></div></div>
+    </section>
+    <section id="panel-estimate" class="panel" hidden>
+      <h2 class="panel-title">工程估算</h2>
+      <p class="panel-note">逐項輸入工項、數量與單價；可計入損耗率及稅率，並保留每項計算式。</p>
+      <div class="form-grid">
+        <label class="field full">工項名稱<input id="estName" type="text" placeholder="例如：RC 樓板混凝土"></label>
+        <label class="field">數量<input id="estQty" type="number" inputmode="decimal" min="0" step="any" placeholder="數量"></label>
+        <label class="field">單位<select id="estUnit"><option>m²</option><option>m³</option><option>m</option><option>式</option><option>坪</option><option>樘</option><option>組</option><option>kg</option><option>t</option></select></label>
+        <label class="field">單價（NT$）<input id="estPrice" type="number" inputmode="decimal" min="0" step="any" placeholder="單價"></label>
+        <label class="field">損耗率（%）<input id="estWaste" type="number" inputmode="decimal" min="0" step="any" value="0"></label>
+        <label class="field">稅率（%）<input id="estTax" type="number" inputmode="decimal" min="0" step="any" value="5"></label>
+      </div>
+      <div class="action-row"><button class="primary-btn" id="estimateAdd">計算並加入估算</button><button class="secondary-btn" id="estimateCopy">複製估算明細</button></div>
+      <div class="result-card"><div class="summary-grid"><div class="summary-box"><span>未稅小計</span><strong id="estSubtotal">NT$ 0</strong></div><div class="summary-box"><span>稅額</span><strong id="estTaxAmount">NT$ 0</strong></div><div class="summary-box"><span>含稅總估算</span><strong id="estGrand">NT$ 0</strong></div><div class="summary-box"><span>估算項目</span><strong id="estCount">0 項</strong></div></div><div id="estimateList" class="list"></div><div class="action-row"><button class="danger-btn" id="estimateClear">清空估算清單</button></div></div>
+    </section>
+  </main>
+  <script>
+    const formulaEl=document.querySelector('#formula'), resultEl=document.querySelector('#result'), memoryEl=document.querySelector('#memory'), modeBtn=document.querySelector('#angleMode');
+    let expr='',answer=0,memory=0,degrees=true,justEvaluated=false;
+    const pretty=s=>s.replaceAll('*','×').replaceAll('/','÷').replaceAll('-','−');
+    const render=()=>{ formulaEl.textContent=expr?pretty(expr):'\u00a0'; resultEl.textContent=expr?resultEl.textContent:String(answer); memoryEl.textContent=memory!==0?`M  ${format(memory)}`:''; formulaEl.scrollLeft=formulaEl.scrollWidth; };
+    const format=n=>{ if(!Number.isFinite(n)) return '錯誤'; if(Object.is(n,-0)) n=0; return new Intl.NumberFormat('en-US',{useGrouping:true,maximumSignificantDigits:12}).format(n); };
+    const add=s=>{ if(justEvaluated&&!/^[+−×÷^%!)]/.test(s)) expr=''; justEvaluated=false; expr+=s; resultEl.textContent=''; render(); };
+    const tokenize=input=>{ const out=[]; const re=/\s*([0-9]+(?:\.[0-9]*)?(?:e[+-]?\d+)?|\.[0-9]+|[A-Za-z]+|π|[()+−×÷*/^!,%])/gy; let i=0; while(i<input.length){ re.lastIndex=i; const m=re.exec(input); if(!m) throw Error('輸入格式錯誤'); out.push(m[1]); i=re.lastIndex; } return out; };
+    function evaluate(source){
+      const t=tokenize(source); let p=0;
+      const peek=()=>t[p]; const eat=x=>{if(peek()!==x) throw Error('括號或運算子錯誤'); p++;};
+      const trig=x=>degrees?x*Math.PI/180:x, inv=x=>degrees?x*180/Math.PI:x;
+      const funcs={sin:x=>Math.sin(trig(x)),cos:x=>Math.cos(trig(x)),tan:x=>Math.tan(trig(x)),asin:x=>inv(Math.asin(x)),acos:x=>inv(Math.acos(x)),atan:x=>inv(Math.atan(x)),sqrt:Math.sqrt,abs:Math.abs,ln:Math.log,log:Math.log10,exp:Math.exp};
+      const primary=()=>{ let x; const a=peek(); if(a===undefined) throw Error('請輸入算式');
+        if(a==='+'||a==='−'){p++; x=primary(); if(a==='−') x=-x;}
+        else if(a==='('){p++; x=additive(); eat(')');}
+        else if(/^(?:\d|\.)/.test(a)){p++; x=Number(a);}
+        else if(a==='π'){p++;x=Math.PI;} else if(a==='e'){p++;x=Math.E;}
+        else if(/^[A-Za-z]+$/.test(a)){p++; if(!(a in funcs)) throw Error('未知函數'); eat('('); const arg=additive(); eat(')'); x=funcs[a](arg);}
+        else throw Error('算式不完整');
+        while(peek()==='!'||peek()==='%'){const op=peek();p++; if(op==='%')x/=100; else {if(x<0||x>170||!Number.isInteger(x)) throw Error('階乘僅支援 0 至 170 的整數'); let f=1;for(let j=2;j<=x;j++)f*=j;x=f;}}
+        return x;
+      };
+      const power=()=>{let x=primary();if(peek()==='^'){p++;x=x**unary();}return x;};
+      const unary=()=>{if(peek()==='−'){p++;return -unary();}if(peek()==='+'){p++;return unary();}return power();};
+      const multiplicative=()=>{let x=unary();while(['×','÷','*','/'].includes(peek())){const op=t[p++],y=unary();x=(op==='×'||op==='*')?x*y:x/y;}return x;};
+      const additive=()=>{let x=multiplicative();while(peek()==='+'||peek()==='−'){const op=t[p++],y=multiplicative();x=op==='+'?x+y:x-y;}return x;};
+      const value=additive(); if(p!==t.length) throw Error('算式格式錯誤'); if(!Number.isFinite(value)) throw Error('結果超出範圍'); return value;
+    }
+    const refreshPreview=()=>{ if(!expr){resultEl.textContent=format(answer);return;} try{resultEl.textContent=format(evaluate(expr));}catch{resultEl.textContent='';} };
+    const insertFunction=name=>add(name+'(');
+    const clear=()=>{expr='';justEvaluated=false;resultEl.textContent='0';formulaEl.textContent='\u00a0';};
+    const runAction=action=>{
+      if(action==='clear') clear();
+      else if(action==='backspace'){expr=expr.slice(0,-1);justEvaluated=false;refreshPreview();render();}
+      else if(action==='decimal') add('.');
+      else if(action==='equals'){try{answer=evaluate(expr||String(answer));expr='';resultEl.textContent=format(answer);formulaEl.textContent='=';justEvaluated=true;}catch(e){resultEl.textContent=e.message||'錯誤';expr='';justEvaluated=false;}render();}
+      else if(action==='inverse') add('^−1');
+      else if(action==='square') add('^2');
+      else if(action==='sqrt') insertFunction('sqrt');
+      else if(action==='factorial') add('!');
+      else if(action==='abs') insertFunction('abs');
+      else if(action==='sign'||action==='toggle-sign') add('−');
+      else if(action==='ans') add(String(answer));
+      else if(action==='round'){try{const n=evaluate(expr||String(answer));answer=Math.round(n);expr='';resultEl.textContent=format(answer);formulaEl.textContent='round';justEvaluated=true;render();}catch{resultEl.textContent='算式不完整';}}
+      else if(action==='memory-clear'){memory=0;render();}
+      else if(action==='memory-recall') add(String(memory));
+      else if(action==='memory-plus'||action==='memory-minus'){try{memory+=(action==='memory-plus'?1:-1)*evaluate(expr||String(answer));render();}catch{resultEl.textContent='算式不完整';}}
+    };
+    document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b===modeBtn){degrees=!degrees;modeBtn.textContent=degrees?'DEG':'RAD';return;}if(b.dataset.digit!==undefined){add(b.dataset.digit);refreshPreview();}else if(b.dataset.fn){insertFunction(b.dataset.fn);refreshPreview();}else if(b.dataset.token){add(b.dataset.token);refreshPreview();}else runAction(b.dataset.action);});
+    document.addEventListener('keydown',e=>{if(/^[0-9]$/.test(e.key)){add(e.key);refreshPreview();}else if(e.key==='.'){add('.');refreshPreview();}else if(e.key==='+'){add('+');refreshPreview();}else if(e.key==='-'){add('−');refreshPreview();}else if(e.key==='*'){add('×');refreshPreview();}else if(e.key==='/'){e.preventDefault();add('÷');refreshPreview();}else if(e.key==='^'){add('^');refreshPreview();}else if(e.key==='('||e.key===')'){add(e.key);refreshPreview();}else if(e.key==='Enter'||e.key==='=')runAction('equals');else if(e.key==='Backspace')runAction('backspace');else if(e.key==='Escape')clear();});
+    const money=n=>'NT$ '+new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Math.round(n));
+    const safe=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:4}).format(n);
+    const areaItems=[],estimateItems=[]; let lastArea=null;
+    const switchPanel=name=>{document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));document.querySelectorAll('.panel').forEach(p=>p.hidden=p.id!==`panel-${name}`);modeBtn.hidden=name!=='science';};
+    document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>switchPanel(b.dataset.panel)));
+    const shapeEl=document.querySelector('#areaShape'),aEl=document.querySelector('#areaA'),bEl=document.querySelector('#areaB'),cEl=document.querySelector('#areaC');
+    const setField=(id,text)=>{const el=document.querySelector(id);el.firstChild.textContent=text;};
+    const updateShape=()=>{const s=shapeEl.value;const circle=s==='circle',trap=s==='trapezoid';document.querySelector('#areaLabelB').hidden=circle;document.querySelector('#areaLabelC').hidden=!(s==='triangle'||trap);setField('#areaLabelA',circle?'半徑（r）':trap?'上底（a）':s==='triangle'?'底（b）':'長（L）');setField('#areaLabelB',trap?'下底（b）':s==='triangle'?'高（h）':'寬（W）');setField('#areaLabelC',trap?'高（h）':'高（h）');aEl.placeholder=circle?'例如 2': '例如 8.5';bEl.placeholder=trap?'例如 5': '例如 6';};
+    shapeEl.addEventListener('change',updateShape);updateShape();
+    const areaResult=document.querySelector('#areaResult'),areaAdd=document.querySelector('#areaAdd');
+    const drawAreas=()=>{document.querySelector('#areaTotal').textContent=`${safe(areaItems.reduce((s,x)=>s+x.m2,0))} m²`;document.querySelector('#areaPing').textContent=`${safe(areaItems.reduce((s,x)=>s+x.m2,0)/3.305785)} 坪`;const list=document.querySelector('#areaList');list.replaceChildren();areaItems.forEach((it,i)=>{const row=document.createElement('div');row.className='list-item';const main=document.createElement('div');main.className='item-main';const name=document.createElement('div');name.className='item-name';name.textContent=it.name;const detail=document.createElement('div');detail.className='item-detail';detail.textContent=it.equation;main.append(name,detail);const val=document.createElement('div');val.className='item-value';val.textContent=`${safe(it.m2)} m²`;const del=document.createElement('button');del.className='danger-btn';del.textContent='移除';del.addEventListener('click',()=>{areaItems.splice(i,1);drawAreas();});const right=document.createElement('div');right.append(val,del);row.append(main,right);list.append(row);});};
+    document.querySelector('#areaCalculate').addEventListener('click',()=>{const kind=shapeEl.value,unit=document.querySelector('#areaUnit').value,factor={m:1,cm:.01,mm:.001,ft:.3048}[unit],a=Number(aEl.value),b=Number(bEl.value),c=Number(cEl.value),count=Number(document.querySelector('#areaCount').value);if(!(a>0&&count>0)||(!['circle'].includes(kind)&&!(b>0))||(['triangle','trapezoid'].includes(kind)&&!(c>0))){areaResult.querySelector('.result-big').textContent='請填寫有效尺寸';areaResult.querySelector('.result-equation').textContent='尺寸與數量需大於 0';areaAdd.disabled=true;lastArea=null;return;}let one,formula;if(kind==='rectangle'){one=a*b*factor**2;formula=`${safe(a)} ${unit} × ${safe(b)} ${unit} × ${factor**2} × ${safe(count)} = ${safe(one*count)} m²`;}else if(kind==='triangle'){one=a*b/2*factor**2;formula=`(${safe(a)} ${unit} × ${safe(b)} ${unit} ÷ 2) × ${factor**2} × ${safe(count)} = ${safe(one*count)} m²`;}else if(kind==='trapezoid'){one=(a+b)*c/2*factor**2;formula=`[(${safe(a)} ${unit} + ${safe(b)} ${unit}) × ${safe(c)} ${unit} ÷ 2] × ${factor**2} × ${safe(count)} = ${safe(one*count)} m²`;}else{one=Math.PI*a*a*factor**2;formula=`π × (${safe(a)} ${unit})² × ${factor**2} × ${safe(count)} = ${safe(one*count)} m²`;}const m2=one*count;lastArea={m2,equation:formula,name:document.querySelector('#areaName').value.trim()||({rectangle:'矩形面積',triangle:'三角形面積',trapezoid:'梯形面積',circle:'圓形面積'}[kind])};areaResult.querySelector('.result-big').textContent=`${safe(m2)} m²`;areaResult.querySelector('.result-equation').textContent=formula;areaResult.querySelector('.result-units')?.remove();const units=document.createElement('div');units.className='result-units';units.textContent=`${safe(m2/3.305785)} 坪　·　${safe(m2*10.7639104)} ft²`;areaResult.append(units);areaAdd.disabled=false;});
+    areaAdd.addEventListener('click',()=>{if(lastArea){areaItems.push(lastArea);drawAreas();}});
+    document.querySelector('#areaClear').addEventListener('click',()=>{areaItems.length=0;drawAreas();});
+    const copyText=async text=>{try{await navigator.clipboard.writeText(text);}catch{const t=document.createElement('textarea');t.value=text;document.body.append(t);t.select();document.execCommand('copy');t.remove();}};
+    document.querySelector('#areaCopy').addEventListener('click',()=>copyText([...areaItems.map(x=>`${x.name}\t${x.equation}\t${safe(x.m2)} m²`),`合計\t${safe(areaItems.reduce((s,x)=>s+x.m2,0))} m²\t${safe(areaItems.reduce((s,x)=>s+x.m2,0)/3.305785)} 坪`].join('\n')));
+    const renderEstimate=()=>{const taxRate=Math.max(0,Number(document.querySelector('#estTax').value)||0)/100,subtotal=estimateItems.reduce((s,x)=>s+x.amount,0),tax=Math.round(subtotal*taxRate);document.querySelector('#estSubtotal').textContent=money(subtotal);document.querySelector('#estTaxAmount').textContent=money(tax);document.querySelector('#estGrand').textContent=money(subtotal+tax);document.querySelector('#estCount').textContent=`${estimateItems.length} 項`;const list=document.querySelector('#estimateList');list.replaceChildren();estimateItems.forEach((it,i)=>{const row=document.createElement('div');row.className='list-item';const main=document.createElement('div');main.className='item-main';const name=document.createElement('div');name.className='item-name';name.textContent=it.name;const detail=document.createElement('div');detail.className='item-detail';detail.textContent=it.detail;main.append(name,detail);const val=document.createElement('div');val.className='item-value';val.textContent=money(it.amount);const del=document.createElement('button');del.className='danger-btn';del.textContent='移除';del.addEventListener('click',()=>{estimateItems.splice(i,1);renderEstimate();});const right=document.createElement('div');right.append(val,del);row.append(main,right);list.append(row);});};
+    document.querySelector('#estimateAdd').addEventListener('click',()=>{const name=document.querySelector('#estName').value.trim(),qty=Number(document.querySelector('#estQty').value),unit=document.querySelector('#estUnit').value,priceInput=document.querySelector('#estPrice').value,price=Number(priceInput),waste=Math.max(0,Number(document.querySelector('#estWaste').value)||0);if(!name||!(qty>0)||priceInput===''||!(price>=0)){document.querySelector('#estName').focus();return;}const amount=Math.round(qty*price*(1+waste/100)),effective=qty*(1+waste/100);estimateItems.push({name,amount,detail:`${safe(qty)} ${unit} × ${money(price)}/${unit} × (1 + ${safe(waste)}% 損耗) = ${safe(effective)} ${unit}，小計 ${money(amount)}`});renderEstimate();});
+    document.querySelector('#estTax').addEventListener('input',renderEstimate);
+    document.querySelector('#estimateClear').addEventListener('click',()=>{estimateItems.length=0;renderEstimate();});
+    document.querySelector('#estimateCopy').addEventListener('click',()=>{const subtotal=estimateItems.reduce((s,x)=>s+x.amount,0),tax=Math.round(subtotal*(Math.max(0,Number(document.querySelector('#estTax').value)||0)/100));copyText([...estimateItems.map(x=>`${x.name}\t${x.detail}\t${money(x.amount)}`),`未稅小計\t${money(subtotal)}`,`稅額\t${money(tax)}`,`含稅總估算\t${money(subtotal+tax)}`].join('\n'));});
+    drawAreas();renderEstimate();
+    render();refreshPreview();
+  </script>
+</body>
+</html>
